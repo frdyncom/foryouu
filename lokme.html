@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GPS Tracker Client</title>
+</head>
+<body>
+  <h2>GPS Tracker Aktif</h2>
+  <p>Lokasi kamu sedang dilacak...</p>
+
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+
+  <script>
+    // ===== Firebase Config =====
+    const firebaseConfig = {
+      apiKey: "AIzaSyAeG3eB_zyWapubCKyIFaaF50aXF8GhipE",
+      authDomain: "tracking-project-d4fa6.firebaseapp.com",
+      databaseURL: "https://tracking-project-d4fa6-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "tracking-project-d4fa6",
+      storageBucket: "tracking-project-d4fa6.firebasestorage.app",
+      messagingSenderId: "953812351968",
+      appId: "1:953812351968:web:17ae63a8d1ece032e68985",
+      measurementId: "G-0HWLTMWJ4T"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+
+    // ===== Generate User ID unik (tetap sama tiap buka) =====
+    function getUserId() {
+      let uid = localStorage.getItem("trackingUserId");
+      if (!uid) {
+        uid = "user_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
+        localStorage.setItem("trackingUserId", uid);
+      }
+      return uid;
+    }
+    const userId = getUserId();
+
+    // ===== Deteksi nama device =====
+    function getDeviceName() {
+      const ua = navigator.userAgent.toLowerCase();
+      if (ua.includes("android")) return "Android Phone";
+      if (ua.includes("iphone")) return "iPhone";
+      if (ua.includes("ipad")) return "iPad";
+      if (ua.includes("windows")) return "Windows PC";
+      if (ua.includes("mac")) return "MacOS";
+      return ua; // fallback → langsung tampilkan userAgent biar keliatan detail
+    }
+
+    // ===== Ambil level baterai =====
+    async function getBatteryLevel() {
+      if (navigator.getBattery) {
+        try {
+          const battery = await navigator.getBattery();
+          return Math.round(battery.level * 100);
+        } catch {
+          return null;
+        }
+      }
+      return null;
+    }
+
+    // ===== Jenis jaringan =====
+    function getNetworkType() {
+      if (navigator.connection && navigator.connection.effectiveType) {
+        return navigator.connection.effectiveType.toUpperCase();
+      }
+      return "Unknown";
+    }
+
+    // ===== Kirim lokasi realtime =====
+    function startTracking() {
+      if (!navigator.geolocation) {
+        alert("Geolocation tidak didukung browser ini");
+        return;
+      }
+
+      navigator.geolocation.watchPosition(async pos => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        const accuracy = pos.coords.accuracy;
+
+        const deviceName = getDeviceName();
+        const battery = await getBatteryLevel();
+        const network = getNetworkType();
+
+        database.ref("users/" + userId).set({
+          lat, lng, accuracy,
+          deviceName,
+          battery: battery !== null ? battery + "%" : "Unknown",
+          network,
+          time: Date.now()
+        });
+      }, err => {
+        console.error("Error ambil lokasi:", err);
+      }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 });
+    }
+
+    startTracking();
+  </script>
+</body>
+</html>
